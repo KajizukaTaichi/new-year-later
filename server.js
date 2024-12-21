@@ -2,52 +2,19 @@ const express = require("express");
 const bcrypt = require("bcrypt");
 const serverless = require("serverless-http");
 const { v4: uuidv4 } = require("uuid");
-const { Sequelize, DataTypes } = require("sequelize");
 
-// SQLiteの設定
-const sequelize = new Sequelize({
-  dialect: "sqlite",
-  storage: "./database.sqlite", // データベースファイルの保存先
-});
-
-// モデル定義
-const Post = sequelize.define("Post", {
-  content: {
-    type: DataTypes.STRING,
-    allowNull: false,
-  },
-  hashedPassword: {
-    type: DataTypes.STRING,
-    allowNull: false,
-  },
-  uniqueId: {
-    type: DataTypes.STRING,
-    allowNull: false,
-    unique: true,
-  },
-});
+// 保存
+let database = {};
 
 // サーバー設定
 const app = express();
-const PORT = 3000;
-
-app.use(express.json()); // JSONリクエストを解析するミドルウェア
-
-// データベースの同期（初回起動時にテーブルが作成されます）
-sequelize
-  .sync()
-  .then(() => {
-    console.log("Database synced");
-  })
-  .catch((err) => {
-    console.error("Unable to sync the database:", err);
-  });
+app.use(express.json());
 
 // 年賀状投稿エンドポイント
 app.post("/post", async (req, res) => {
-  const { content, password } = req.body; // content: 年賀状データ, password: アクセス用パスワード
+  // content: 年賀状データ, password: アクセス用パスワード
+  const { content, password } = req.body;
 
-  console.log(req.body);
   if (!content || !password) {
     return res
       .status(400)
@@ -58,13 +25,7 @@ app.post("/post", async (req, res) => {
   const hashedPassword = await bcrypt.hash(password, 10); // パスワードをハッシュ化
 
   try {
-    const post = await Post.create({
-      content,
-      hashedPassword,
-      uniqueId: id,
-    });
-
-    // 成功レスポンス
+    database[id] = { password: hashedPassword, content: content };
     res.json({ url: `https://new-year-later.vercel.app/view/${id}` });
   } catch (error) {
     res.status(500).json({ error: "Error saving post." });
@@ -77,13 +38,13 @@ app.post("/view/:id", async (req, res) => {
   const { password } = req.body;
 
   try {
-    const post = await Post.findOne({ where: { uniqueId: id } });
+    const post = database[id];
 
     if (!post) {
       return res.status(404).json({ error: "Post not found." });
     }
 
-    const isMatch = await bcrypt.compare(password, post.hashedPassword);
+    const isMatch = await bcrypt.compare(password, post.password);
     if (!isMatch) {
       return res.status(401).json({ error: "Invalid password." });
     }
