@@ -1,5 +1,6 @@
 const express = require("express");
 const bcrypt = require("bcrypt");
+const serverless = require("serverless-http");
 const { v4: uuidv4 } = require("uuid");
 const { Sequelize, DataTypes } = require("sequelize");
 
@@ -64,7 +65,7 @@ app.post("/post", async (req, res) => {
     });
 
     // 成功レスポンス
-    res.json({ url: `http://localhost:${PORT}/view/${id}` });
+    res.json({ url: `https://new-year-later.vercel.app/view/${id}` });
   } catch (error) {
     res.status(500).json({ error: "Error saving post." });
   }
@@ -93,7 +94,4 @@ app.post("/view/:id", async (req, res) => {
   }
 });
 
-// サーバー起動
-app.listen(PORT, () => {
-  console.log(`Server is running on http://localhost:${PORT}`);
-});
+module.exports.handler = serverless(app);
