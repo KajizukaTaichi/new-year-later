@@ -1,20 +1,52 @@
 const express = require("express");
 const bcrypt = require("bcrypt");
-const serverless = require("serverless-http");
 const { v4: uuidv4 } = require("uuid");
+const { Sequelize, DataTypes } = require("sequelize");
 
-// 保存
-let database = {};
+// SQLiteの設定
+const sequelize = new Sequelize({
+  dialect: "sqlite",
+  storage: "./database.sqlite", // データベースファイルの保存先
+});
+
+// モデル定義
+const Post = sequelize.define("Post", {
+  content: {
+    type: DataTypes.STRING,
+    allowNull: false,
+  },
+  hashedPassword: {
+    type: DataTypes.STRING,
+    allowNull: false,
+  },
+  uniqueId: {
+    type: DataTypes.STRING,
+    allowNull: false,
+    unique: true,
+  },
+});
 
 // サーバー設定
 const app = express();
-app.use(express.json());
+const PORT = 3000;
+
+app.use(express.json()); // JSONリクエストを解析するミドルウェア
+
+// データベースの同期（初回起動時にテーブルが作成されます）
+sequelize
+  .sync()
+  .then(() => {
+    console.log("Database synced");
+  })
+  .catch((err) => {
+    console.error("Unable to sync the database:", err);
+  });
 
 // 年賀状投稿エンドポイント
 app.post("/post", async (req, res) => {
-  // content: 年賀状データ, password: アクセス用パスワード
-  const { content, password } = req.body;
+  const { content, password } = req.body; // content: 年賀状データ, password: アクセス用パスワード
 
+  console.log(req.body);
   if (!content || !password) {
     return res
       .status(400)
@@ -25,8 +57,14 @@ app.post("/post", async (req, res) => {
   const hashedPassword = await bcrypt.hash(password, 10); // パスワードをハッシュ化
 
   try {
-    database[id] = { password: hashedPassword, content: content };
-    res.json({ url: `https://new-year-later.vercel.app/view/${id}` });
+    const post = await Post.create({
+      content,
+      hashedPassword,
+      uniqueId: id,
+    });
+
+    // 成功レスポンス
+    res.json({ url: `http://localhost:${PORT}/view/${id}` });
   } catch (error) {
     res.status(500).json({ error: "Error saving post." });
   }
@@ -38,13 +76,13 @@ app.post("/view/:id", async (req, res) => {
   const { password } = req.body;
 
   try {
-    const post = database[id];
+    const post = await Post.findOne({ where: { uniqueId: id } });
 
     if (!post) {
       return res.status(404).json({ error: "Post not found." });
     }
 
-    const isMatch = await bcrypt.compare(password, post.password);
+    const isMatch = await bcrypt.compare(password, post.hashedPassword);
     if (!isMatch) {
       return res.status(401).json({ error: "Invalid password." });
     }
@@ -55,4 +93,7 @@ app.post("/view/:id", async (req, res) => {
   }
 });
 
-module.exports = serverless(app);
+// サーバー起動
+app.listen(PORT, () => {
+  console.log(`Server is running on http://localhost:${PORT}`);
+});
