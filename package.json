@@ -4,7 +4,9 @@
   "dependencies": {
     "bcrypt": "^5.1.1",
     "express": "^4.18.2",
+    "sequelize": "^6.37.5",
     "serverless-http": "^2.7.0",
+    "sqlite3": "^5.1.7",
     "uuid": "^11.0.3"
   },
   "scripts": {
