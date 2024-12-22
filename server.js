@@ -55,4 +55,4 @@ app.post("/view/:id", async (req, res) => {
   }
 });
 
-module.exports.handler = serverless(app);
+module.exports = serverless(app);
